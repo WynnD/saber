@@ -22,7 +22,7 @@ class SbnParser {
       throw FileSystemException('File not found', path);
     }
     final bytes = file.readAsBytesSync();
-    final doc = parse(Uint8List.fromList(bytes), filePath: path);
+    final doc = parse(bytes, filePath: path);
     return _loadAssets(doc, path);
   }
 
@@ -173,7 +173,12 @@ class SbnParser {
     final points = <SbnPoint>[];
     for (final p in pointsJson) {
       if (fileVersion >= 13 && p is BsonBinary) {
-        final floats = p.byteList.buffer.asFloat32List();
+        final byteList = p.byteList;
+        if (byteList.lengthInBytes < 8) continue; // need at least x,y
+        final floats = byteList.buffer.asFloat32List(
+          byteList.offsetInBytes,
+          byteList.lengthInBytes ~/ 4,
+        );
         points.add(SbnPoint(
           floats[0] + offsetX,
           floats[1] + offsetY,
@@ -245,21 +250,40 @@ class SbnParser {
 
   /// Load external asset files (file.sbn2.0, file.sbn2.1, etc.)
   static SbnDocument _loadAssets(SbnDocument doc, String sbn2Path) {
+    final pages = <SbnPage>[];
     for (final page in doc.pages) {
-      final allImages = [
-        ...page.images,
-        if (page.backgroundImage != null) page.backgroundImage!,
-      ];
-      for (final image in allImages) {
-        if (image.assetIndex != null && image.bytes == null) {
-          final assetPath = '$sbn2Path.${image.assetIndex}';
-          final assetFile = File(assetPath);
-          if (assetFile.existsSync()) {
-            image.bytes = assetFile.readAsBytesSync();
-          }
-        }
+      final images =
+          page.images.map((img) => _loadAsset(img, sbn2Path)).toList();
+      final bgImage = page.backgroundImage != null
+          ? _loadAsset(page.backgroundImage!, sbn2Path)
+          : null;
+      pages.add(SbnPage(
+        width: page.width,
+        height: page.height,
+        strokes: page.strokes,
+        images: images,
+        quillDelta: page.quillDelta,
+        backgroundImage: bgImage,
+      ));
+    }
+    return SbnDocument(
+      fileVersion: doc.fileVersion,
+      backgroundColor: doc.backgroundColor,
+      backgroundPattern: doc.backgroundPattern,
+      lineHeight: doc.lineHeight,
+      lineThickness: doc.lineThickness,
+      pages: pages,
+    );
+  }
+
+  static SbnImage _loadAsset(SbnImage image, String sbn2Path) {
+    if (image.assetIndex != null && image.bytes == null) {
+      final assetPath = '$sbn2Path.${image.assetIndex}';
+      final assetFile = File(assetPath);
+      if (assetFile.existsSync()) {
+        return image.copyWith(bytes: assetFile.readAsBytesSync());
       }
     }
-    return doc;
+    return image;
   }
 }

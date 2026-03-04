@@ -43,23 +43,4 @@ class StrokePath {
 
     return svgPoints.isNotEmpty ? 'M${svgPoints.join('L')}' : '';
   }
-
-  /// Convert a circle stroke to an SVG path string.
-  static String circleToSvgPath(SbnStroke stroke) {
-    final cx = stroke.centerX ?? 0;
-    final cy = stroke.centerY ?? 0;
-    final r = stroke.radius ?? 0;
-    return 'M$cx,$cy m${-r},0 a$r,$r 0 1,0 ${r * 2},0 a$r,$r 0 1,0 ${-r * 2},0';
-  }
-
-  /// Convert a rectangle stroke to an SVG path string.
-  static String rectToSvgPath(SbnStroke stroke) {
-    final l = stroke.rectLeft ?? 0;
-    final t = stroke.rectTop ?? 0;
-    final w = stroke.rectWidth ?? 0;
-    final h = stroke.rectHeight ?? 0;
-    final r = l + w;
-    final b = t + h;
-    return 'M$l,$t L$r,$t L$r,$b L$l,$b Z';
-  }
 }

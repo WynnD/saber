@@ -187,7 +187,7 @@ class SbnImage {
   final double width;
   final double height;
   final int? assetIndex;
-  Uint8List? bytes;
+  final Uint8List? bytes;
 
   SbnImage({
     required this.id,
@@ -199,4 +199,17 @@ class SbnImage {
     this.assetIndex,
     this.bytes,
   });
+
+  SbnImage copyWith({Uint8List? bytes}) {
+    return SbnImage(
+      id: id,
+      extension: extension,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      assetIndex: assetIndex,
+      bytes: bytes ?? this.bytes,
+    );
+  }
 }
