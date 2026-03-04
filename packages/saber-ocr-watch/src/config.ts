@@ -6,7 +6,7 @@ export const config = {
     return process.env.SABER_NOTES_DIR || join(homedir(), "Documents", "Saber");
   },
   get ollamaUrl(): string {
-    return process.env.OLLAMA_URL || "http://192.168.0.101:8080";
+    return process.env.OLLAMA_URL || "http://localhost:11434";
   },
   get ollamaModel(): string {
     return process.env.OLLAMA_MODEL || "qwen3.5:9b";

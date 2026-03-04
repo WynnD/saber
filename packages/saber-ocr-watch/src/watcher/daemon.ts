@@ -2,7 +2,7 @@ import { watch } from "fs";
 import { config } from "../config.js";
 import { discoverNotes } from "../notes/discovery.js";
 import { ocrNote } from "../ocr/pipeline.js";
-import { basename } from "path";
+import { basename, join } from "path";
 
 const DEBOUNCE_MS = 2000;
 
@@ -30,7 +30,7 @@ export async function startWatcher(): Promise<void> {
     // Ignore .ocr files
     if (filename.endsWith(".ocr")) return;
 
-    const fullPath = `${dir}/${filename}`;
+    const fullPath = join(dir, filename);
 
     // Debounce: Saber may write multiple times during save
     const existing = timers.get(fullPath);

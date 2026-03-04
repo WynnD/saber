@@ -1,8 +1,7 @@
 import { execFile as execFileCb } from "child_process";
-import { mkdir, readdir, rm, writeFile } from "fs/promises";
+import { mkdtemp, mkdir, readdir, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
-import { createHash } from "crypto";
 import { tmpdir } from "os";
 import { config } from "../config.js";
 import { readSbn, resolveAssetPath, type EmbeddedAsset } from "../notes/sbn-reader.js";
@@ -11,9 +10,8 @@ import { ocrImage } from "./ollama.js";
 
 const execFile = promisify(execFileCb);
 
-function tempPrefix(notePath: string): string {
-  const hash = createHash("md5").update(notePath).digest("hex").slice(0, 8);
-  return join(tmpdir(), `saber-ocr-${hash}`);
+async function createTempDir(): Promise<string> {
+  return mkdtemp(join(tmpdir(), "saber-ocr-"));
 }
 
 export interface OcrResult {
@@ -63,12 +61,8 @@ async function ocrPdfPages(pdfPath: string, imgDir: string): Promise<{ text: str
   await mkdir(imgDir, { recursive: true });
   await execFile("pdftoppm", ["-png", "-r", "200", pdfPath, join(imgDir, "page")]);
   const files = (await readdir(imgDir)).filter((f) => f.endsWith(".png")).sort();
-  const pageTexts: string[] = [];
-  for (let i = 0; i < files.length; i++) {
-    const imgPath = join(imgDir, files[i]);
-    const text = await ocrImage(imgPath);
-    pageTexts.push(`--- Page ${i + 1} ---\n${text}`);
-  }
+  const rawTexts = await Promise.all(files.map((f) => ocrImage(join(imgDir, f))));
+  const pageTexts = rawTexts.map((text, i) => `--- Page ${i + 1} ---\n${text}`);
   return { text: pageTexts.join("\n\n"), pageCount: files.length };
 }
 
@@ -76,9 +70,8 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
   const pdfExtract = opts.pdfExtract ?? "auto";
   const start = Date.now();
   const ocrPath = notePath + ".ocr";
-  const prefix = tempPrefix(notePath);
-  const imgDir = prefix + "-pages";
-  const tempFiles: string[] = [imgDir];
+  const tempDir = await createTempDir();
+  const imgDir = join(tempDir, "pages");
 
   try {
     // 1. Parse the .sbn2 BSON
@@ -112,9 +105,8 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
         embeddedPdfPath = resolved.path;
       } else {
         // Write inline asset to temp file
-        embeddedPdfPath = prefix + "-embedded.pdf";
+        embeddedPdfPath = join(tempDir, "embedded.pdf");
         await writeFile(embeddedPdfPath, resolved.data);
-        tempFiles.push(embeddedPdfPath);
       }
 
       pdfText = await extractPdfText(embeddedPdfPath);
@@ -137,10 +129,9 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
         console.error(`[saber-ocr-watch] Using embedded PDF directly for OCR`);
       } else {
         // Render via sbn2pdf (has strokes, quill, or mixed content)
-        pdfToOcr = prefix + ".pdf";
-        tempFiles.push(pdfToOcr);
-        const cmdParts = config.sbn2pdfCmd.split(" ");
-        await execFile(cmdParts[0], [...cmdParts.slice(1), notePath, pdfToOcr]);
+        pdfToOcr = join(tempDir, "rendered.pdf");
+        const [cmd, ...cmdArgs] = config.sbn2pdfCmd.split(/\s+/);
+        await execFile(cmd, [...cmdArgs, notePath, pdfToOcr]);
       }
 
       // 5. Rasterize and OCR
@@ -175,8 +166,6 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
       elapsed: Date.now() - start,
     };
   } finally {
-    for (const f of tempFiles) {
-      await rm(f, { recursive: true, force: true }).catch(() => {});
-    }
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }

@@ -80,6 +80,11 @@ export async function resolveAssetPath(
   asset: EmbeddedAsset,
   inlineAssets: Buffer[],
 ): Promise<{ path: string; isTemp: false } | { data: Buffer; isTemp: true }> {
+  // Validate asset index to prevent path traversal
+  if (!Number.isInteger(asset.index) || asset.index < 0) {
+    throw new Error(`Invalid asset index: ${asset.index}`);
+  }
+
   // Check sidecar file first
   const sidecarPath = `${sbn2Path}.${asset.index}`;
   try {
