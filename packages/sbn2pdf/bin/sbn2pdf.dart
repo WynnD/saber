@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:sbn2pdf/sbn2pdf.dart';
 
-void main(List<String> arguments) async {
+Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Show usage')
     ..addFlag('verbose', abbr: 'v', negatable: false, help: 'Verbose output');
