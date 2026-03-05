@@ -1,18 +1,25 @@
 import { readdir, stat } from "fs/promises";
-import { join, relative } from "path";
+import { join, relative, basename } from "path";
 import { config } from "../config.js";
+import {
+  initDecryption,
+  decryptFileName,
+  type DecryptionContext,
+} from "../crypto.js";
 
 export interface NoteInfo {
-  /** Absolute path to the .sbn2 file */
+  /** Absolute path to the file (.sbn2 or .sbe) */
   path: string;
-  /** Note name (relative path without extension) */
+  /** Decrypted note name (relative path without extension) */
   name: string;
-  /** mtime of the .sbn2 file */
+  /** mtime of the note file */
   modified: Date;
-  /** Whether a .sbn2.ocr sibling exists and is fresh */
+  /** Whether an OCR cache file exists and is fresh */
   ocrCached: boolean;
   /** Path to the .ocr file */
   ocrPath: string;
+  /** Whether the note is encrypted (.sbe) */
+  encrypted: boolean;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -24,11 +31,20 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
-export async function discoverNotes(
-  dir?: string,
-): Promise<NoteInfo[]> {
+let _ctx: DecryptionContext | null = null;
+
+/** Get or lazily init decryption context */
+export async function getDecryptionContext(): Promise<DecryptionContext | null> {
+  if (_ctx) return _ctx;
+  if (!config.encPassword) return null;
+  _ctx = await initDecryption();
+  return _ctx;
+}
+
+export async function discoverNotes(dir?: string): Promise<NoteInfo[]> {
   const notesDir = dir ?? config.notesDir;
   const notes: NoteInfo[] = [];
+  const ctx = await getDecryptionContext();
 
   async function walk(d: string) {
     const entries = await readdir(d, { withFileTypes: true });
@@ -37,6 +53,7 @@ export async function discoverNotes(
       if (entry.isDirectory()) {
         await walk(full);
       } else if (entry.name.endsWith(".sbn2")) {
+        // Unencrypted note
         const s = await stat(full);
         const ocrPath = full + ".ocr";
         let ocrCached = false;
@@ -50,7 +67,39 @@ export async function discoverNotes(
           modified: s.mtime,
           ocrCached,
           ocrPath,
+          encrypted: false,
         });
+      } else if (entry.name.endsWith(".sbe") && ctx) {
+        // Encrypted note — decrypt the file name
+        const encHex = basename(entry.name, ".sbe");
+        try {
+          const decryptedPath = decryptFileName(encHex, ctx);
+          const noteName = decryptedPath.replace(/\.sbn2$/, "").replace(/^\//, "");
+          const s = await stat(full);
+          // OCR cache lives next to the encrypted file
+          const ocrPath = full + ".ocr";
+          let ocrCached = false;
+          if (await exists(ocrPath)) {
+            const ocrStat = await stat(ocrPath);
+            ocrCached = ocrStat.mtimeMs >= s.mtimeMs;
+          }
+          notes.push({
+            path: full,
+            name: noteName,
+            modified: s.mtime,
+            ocrCached,
+            ocrPath,
+            encrypted: true,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          // Skip config.sbc and non-note .sbe files
+          if (!entry.name.includes("config")) {
+            console.error(
+              `[discovery] Could not decrypt filename ${entry.name}: ${msg}`,
+            );
+          }
+        }
       }
     }
   }

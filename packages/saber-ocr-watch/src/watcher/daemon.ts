@@ -17,7 +17,7 @@ export async function startWatcher(): Promise<void> {
   if (stale.length > 0) {
     console.error(`[saber-ocr-watch] ${stale.length} notes need OCR`);
     for (const note of stale) {
-      await processNote(note.path);
+      await processNote(note.path, note.name, note.encrypted);
     }
   }
   console.error(`[saber-ocr-watch] Initial scan complete. Watching for changes...`);
@@ -26,9 +26,13 @@ export async function startWatcher(): Promise<void> {
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
   watch(dir, { recursive: true }, (_event, filename) => {
-    if (!filename || !filename.endsWith(".sbn2")) return;
-    // Ignore .ocr files
+    if (!filename) return;
+    // Ignore .ocr cache files
     if (filename.endsWith(".ocr")) return;
+    // Handle both unencrypted (.sbn2) and encrypted (.sbe) files
+    const isSbn2 = filename.endsWith(".sbn2");
+    const isSbe = filename.endsWith(".sbe");
+    if (!isSbn2 && !isSbe) return;
 
     const fullPath = join(dir, filename);
 
@@ -40,17 +44,20 @@ export async function startWatcher(): Promise<void> {
       fullPath,
       setTimeout(() => {
         timers.delete(fullPath);
-        processNote(fullPath);
+        processNote(fullPath, filename, isSbe);
       }, DEBOUNCE_MS),
     );
   });
 }
 
-async function processNote(notePath: string): Promise<void> {
-  const name = basename(notePath, ".sbn2");
+async function processNote(
+  notePath: string,
+  name: string,
+  encrypted: boolean,
+): Promise<void> {
   try {
-    console.error(`[saber-ocr-watch] OCR'ing "${name}"...`);
-    const result = await ocrNote(notePath);
+    console.error(`[saber-ocr-watch] OCR'ing "${name}"${encrypted ? " (encrypted)" : ""}...`);
+    const result = await ocrNote(notePath, { encrypted });
     const secs = (result.elapsed / 1000).toFixed(1);
     console.error(
       `[saber-ocr-watch] OCR'd "${name}" (${result.pageCount} pages, ${secs}s)`,

@@ -1,5 +1,5 @@
 import { execFile as execFileCb } from "child_process";
-import { mkdtemp, mkdir, readdir, rm, writeFile } from "fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
 import { tmpdir } from "os";
@@ -7,6 +7,8 @@ import { config } from "../config.js";
 import { readSbn, resolveAssetPath, type EmbeddedAsset } from "../notes/sbn-reader.js";
 import { extractQuillText } from "./quill.js";
 import { ocrImage } from "./ollama.js";
+import { decryptNote } from "../crypto.js";
+import { getDecryptionContext } from "../notes/discovery.js";
 
 const execFile = promisify(execFileCb);
 
@@ -29,6 +31,7 @@ export type PdfExtractMode = "auto" | "force" | "never";
 
 export interface OcrOptions {
   pdfExtract?: PdfExtractMode;
+  encrypted?: boolean;
 }
 
 /** Find embedded PDF assets in the note */
@@ -74,8 +77,20 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
   const imgDir = join(tempDir, "pages");
 
   try {
-    // 1. Parse the .sbn2 BSON
-    const doc = await readSbn(notePath);
+    // 1. Parse the note — decrypt if encrypted (.sbe)
+    let doc;
+    if (opts.encrypted) {
+      const ctx = await getDecryptionContext();
+      if (!ctx) throw new Error("Decryption context not available");
+      const encryptedBytes = await readFile(notePath);
+      const decryptedBytes = decryptNote(encryptedBytes, ctx);
+      // Write decrypted bytes to temp file for readSbn
+      const tempSbn = join(tempDir, "decrypted.sbn2");
+      await writeFile(tempSbn, decryptedBytes);
+      doc = await readSbn(tempSbn);
+    } else {
+      doc = await readSbn(notePath);
+    }
 
     // 2. Extract quill text (free — no OCR needed for typed content)
     const quillParts: string[] = [];

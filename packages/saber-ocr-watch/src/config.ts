@@ -14,4 +14,7 @@ export const config = {
   get sbn2pdfCmd(): string {
     return process.env.SBN2PDF_CMD || "dart pub global run sbn2pdf";
   },
+  get encPassword(): string {
+    return process.env.SABER_ENC_PASSWORD || "";
+  },
 };
