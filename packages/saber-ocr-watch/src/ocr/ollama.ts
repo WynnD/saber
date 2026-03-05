@@ -12,11 +12,11 @@ export async function ocrImage(imagePath: string): Promise<string> {
   const imageData = await readFile(imagePath);
   const base64 = imageData.toString("base64");
 
-  const resp = await fetch(`${config.ollamaUrl}/v1/chat/completions`, {
+  const resp = await fetch(`${config.openaiUrl}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: config.ollamaModel,
+      model: config.visionModel,
       messages: [
         {
           role: "user",
@@ -36,7 +36,7 @@ export async function ocrImage(imagePath: string): Promise<string> {
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`Ollama error ${resp.status}: ${text}`);
+    throw new Error(`Vision API error ${resp.status}: ${text}`);
   }
 
   const data = (await resp.json()) as ChatCompletionResponse;
