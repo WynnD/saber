@@ -80,7 +80,9 @@ export function decryptNote(
   encrypted: Buffer,
   ctx: DecryptionContext,
 ): Buffer {
-  return stripPkcs7(aesDecrypt(encrypted, ctx.noteKey, ctx.iv));
+  // Saber uses the password-derived key (client.encrypter) for both
+  // file names and file contents
+  return stripPkcs7(aesDecrypt(encrypted, ctx.passwordKey, ctx.iv));
 }
 
 /** Decrypt an encrypted file name (hex-encoded) back to original path */
