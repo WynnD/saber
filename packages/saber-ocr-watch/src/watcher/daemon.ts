@@ -27,8 +27,8 @@ export async function startWatcher(): Promise<void> {
 
   watch(dir, { recursive: true }, (_event, filename) => {
     if (!filename) return;
-    // Ignore .ocr cache files
-    if (filename.endsWith(".ocr")) return;
+    // Ignore .md cache files
+    if (filename.endsWith(".md")) return;
     // Handle both unencrypted (.sbn2) and encrypted (.sbe) files
     const isSbn2 = filename.endsWith(".sbn2");
     const isSbe = filename.endsWith(".sbe");

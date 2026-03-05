@@ -17,7 +17,7 @@ export interface NoteInfo {
   modified: Date;
   /** Whether an OCR cache file exists and is fresh */
   ocrCached: boolean;
-  /** Path to the .ocr file */
+  /** Path to the .md OCR cache file */
   ocrPath: string;
   /** Whether the note is encrypted (.sbe) */
   encrypted: boolean;
@@ -56,7 +56,7 @@ export async function discoverNotes(dir?: string): Promise<NoteInfo[]> {
       } else if (entry.name.endsWith(".sbn2")) {
         // Unencrypted note
         const s = await stat(full);
-        const ocrPath = full + ".ocr";
+        const ocrPath = full + ".md";
         let ocrCached = false;
         if (await exists(ocrPath)) {
           const ocrStat = await stat(ocrPath);
@@ -75,12 +75,12 @@ export async function discoverNotes(dir?: string): Promise<NoteInfo[]> {
         const encHex = basename(entry.name, ".sbe");
         try {
           const decryptedPath = decryptFileName(encHex, ctx);
-          // Only process actual .sbn2 note files, skip sidecars (.sbn2.0, .sbn2.p, .sbn2.ocr)
+          // Only process actual .sbn2 note files, skip sidecars (.sbn2.0, .sbn2.p, .sbn2.md)
           if (!decryptedPath.endsWith(".sbn2")) continue;
           const noteName = decryptedPath.replace(/\.sbn2$/, "").replace(/^\//, "");
           const s = await stat(full);
           // OCR cache is also encrypted: encrypt("note.sbn2.ocr") + ".sbe"
-          const ocrEncName = encryptPath(decryptedPath + ".ocr", ctx) + ".sbe";
+          const ocrEncName = encryptPath(decryptedPath + ".md", ctx) + ".sbe";
           const ocrPath = join(d, ocrEncName);
           let ocrCached = false;
           if (await exists(ocrPath)) {

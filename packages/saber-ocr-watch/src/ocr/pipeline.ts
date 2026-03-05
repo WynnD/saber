@@ -73,7 +73,7 @@ async function ocrPdfPages(pdfPath: string, imgDir: string): Promise<{ text: str
 export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<OcrResult> {
   const pdfExtract = opts.pdfExtract ?? "auto";
   const start = Date.now();
-  let ocrPath = notePath + ".ocr";
+  let ocrPath = notePath + ".md";
   const tempDir = await createTempDir();
   const imgDir = join(tempDir, "pages");
 
@@ -203,7 +203,7 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
       // Derive encrypted filename: encrypt the note's decrypted path + ".ocr"
       const encHex = basename(notePath, ".sbe");
       const decryptedName = decryptFileName(encHex, ctx);
-      const ocrName = decryptedName + ".ocr";
+      const ocrName = decryptedName + ".md";
       const encryptedOcrName = encryptPath(ocrName, ctx) + ".sbe";
       const encryptedOcrPath = join(dirname(notePath), encryptedOcrName);
       await writeFile(encryptedOcrPath, encryptedOcr);
