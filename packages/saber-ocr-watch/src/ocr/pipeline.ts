@@ -7,7 +7,7 @@ import { config } from "../config.js";
 import { readSbn, resolveAssetPath, type EmbeddedAsset } from "../notes/sbn-reader.js";
 import { extractQuillText } from "./quill.js";
 import { ocrImage } from "./ollama.js";
-import { decryptNote, encryptPath, decryptFileName } from "../crypto.js";
+import { decryptNote, encryptPath, encryptNote, decryptFileName } from "../crypto.js";
 import { getDecryptionContext } from "../notes/discovery.js";
 import { basename, dirname } from "path";
 
@@ -73,7 +73,7 @@ async function ocrPdfPages(pdfPath: string, imgDir: string): Promise<{ text: str
 export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<OcrResult> {
   const pdfExtract = opts.pdfExtract ?? "auto";
   const start = Date.now();
-  const ocrPath = notePath + ".ocr";
+  let ocrPath = notePath + ".ocr";
   const tempDir = await createTempDir();
   const imgDir = join(tempDir, "pages");
 
@@ -194,8 +194,23 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
     }
     const fullText = sections.join("\n\n");
 
-    // 7. Write .sbn2.ocr
-    await writeFile(ocrPath, fullText, "utf-8");
+    // 7. Write OCR cache — encrypt if the source note was encrypted
+    if (opts.encrypted) {
+      const ctx = await getDecryptionContext();
+      if (!ctx) throw new Error("Decryption context not available");
+      // Encrypt OCR text with same key as notes
+      const encryptedOcr = encryptNote(Buffer.from(fullText, "utf-8"), ctx);
+      // Derive encrypted filename: encrypt the note's decrypted path + ".ocr"
+      const encHex = basename(notePath, ".sbe");
+      const decryptedName = decryptFileName(encHex, ctx);
+      const ocrName = decryptedName + ".ocr";
+      const encryptedOcrName = encryptPath(ocrName, ctx) + ".sbe";
+      const encryptedOcrPath = join(dirname(notePath), encryptedOcrName);
+      await writeFile(encryptedOcrPath, encryptedOcr);
+      ocrPath = encryptedOcrPath;
+    } else {
+      await writeFile(ocrPath, fullText, "utf-8");
+    }
 
     return {
       notePath,

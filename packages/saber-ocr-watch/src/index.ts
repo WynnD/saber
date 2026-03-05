@@ -1,9 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { discoverNotes, findNote } from "./notes/discovery.js";
+import { discoverNotes, findNote, getDecryptionContext } from "./notes/discovery.js";
 import { searchNotes } from "./notes/search.js";
 import { readFile } from "fs/promises";
+import { decryptNote } from "./crypto.js";
 
 const server = new McpServer({
   name: "saber-notes",
@@ -61,7 +62,15 @@ server.tool(
         isError: true,
       };
     }
-    const content = await readFile(note.ocrPath, "utf-8");
+    let content: string;
+    if (note.encrypted) {
+      const ctx = await getDecryptionContext();
+      if (!ctx) return { content: [{ type: "text", text: "Decryption context not available" }], isError: true };
+      const raw = await readFile(note.ocrPath);
+      content = decryptNote(raw, ctx).toString("utf-8");
+    } else {
+      content = await readFile(note.ocrPath, "utf-8");
+    }
     return {
       content: [{ type: "text", text: `# ${note.name}\n\n${content}` }],
     };

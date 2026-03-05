@@ -1,10 +1,23 @@
 import { readFile } from "fs/promises";
-import { discoverNotes } from "./discovery.js";
+import { discoverNotes, getDecryptionContext } from "./discovery.js";
+import { decryptNote } from "../crypto.js";
 
 export interface SearchResult {
   note: string;
   line: number;
   context: string;
+}
+
+/** Read OCR content, decrypting if the note is encrypted */
+async function readOcrContent(
+  ocrPath: string,
+  encrypted: boolean,
+): Promise<string> {
+  const raw = await readFile(ocrPath);
+  if (!encrypted) return raw.toString("utf-8");
+  const ctx = await getDecryptionContext();
+  if (!ctx) throw new Error("Decryption context not available");
+  return decryptNote(raw, ctx).toString("utf-8");
 }
 
 export async function searchNotes(
@@ -20,7 +33,7 @@ export async function searchNotes(
     if (!note.ocrCached) continue;
     if (results.length >= maxResults) break;
 
-    const content = await readFile(note.ocrPath, "utf-8");
+    const content = await readOcrContent(note.ocrPath, note.encrypted);
     const lines = content.split("\n");
 
     for (let i = 0; i < lines.length; i++) {

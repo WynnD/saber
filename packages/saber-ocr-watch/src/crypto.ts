@@ -95,6 +95,15 @@ export function decryptFileName(
   return decrypted.toString("utf-8");
 }
 
+/** Encrypt data using the password key (matching Saber's client.encrypter) */
+export function encryptNote(
+  data: Buffer,
+  ctx: DecryptionContext,
+): Buffer {
+  const cipher = createCipheriv("aes-256-ctr", ctx.passwordKey, ctx.iv);
+  return Buffer.concat([cipher.update(data), cipher.final()]);
+}
+
 /** Encrypt a path to match Saber's file naming (for lookups) */
 export function encryptPath(
   path: string,

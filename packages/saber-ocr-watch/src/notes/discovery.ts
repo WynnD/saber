@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import {
   initDecryption,
   decryptFileName,
+  encryptPath,
   type DecryptionContext,
 } from "../crypto.js";
 
@@ -78,8 +79,9 @@ export async function discoverNotes(dir?: string): Promise<NoteInfo[]> {
           if (!decryptedPath.endsWith(".sbn2")) continue;
           const noteName = decryptedPath.replace(/\.sbn2$/, "").replace(/^\//, "");
           const s = await stat(full);
-          // OCR cache lives next to the encrypted file
-          const ocrPath = full + ".ocr";
+          // OCR cache is also encrypted: encrypt("note.sbn2.ocr") + ".sbe"
+          const ocrEncName = encryptPath(decryptedPath + ".ocr", ctx) + ".sbe";
+          const ocrPath = join(d, ocrEncName);
           let ocrCached = false;
           if (await exists(ocrPath)) {
             const ocrStat = await stat(ocrPath);
