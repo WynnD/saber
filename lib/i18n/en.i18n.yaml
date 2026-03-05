@@ -13,6 +13,10 @@ home:
     browse: Browse
     whiteboard: Whiteboard
     settings: Settings
+  search:
+    search: Search notes
+    noResults: No results found
+    hint: Search handwritten and typed text...
   tooltips:
     newNote: New note
     showUpdateDialog: Show update dialog

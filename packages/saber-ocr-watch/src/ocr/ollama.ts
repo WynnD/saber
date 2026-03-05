@@ -2,7 +2,7 @@ import { readFile } from "fs/promises";
 import { config } from "../config.js";
 
 const OCR_PROMPT =
-  "Transcribe all text visible in this image. Return only the transcribed text, preserving line breaks and layout. If there is no text, respond with [no text].";
+  "Transcribe everything visible in this handwritten note. Use markdown.";
 
 interface ChatCompletionResponse {
   choices: Array<{ message: { content: string } }>;

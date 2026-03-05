@@ -10,6 +10,7 @@ import 'package:saber/components/home/move_note_button.dart';
 import 'package:saber/components/home/new_note_button.dart';
 import 'package:saber/components/home/rename_note_button.dart';
 import 'package:saber/components/home/syncing_button.dart';
+import 'package:saber/pages/home/search.dart';
 import 'package:saber/components/home/welcome.dart';
 import 'package:saber/components/theming/saber_theme.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
@@ -139,7 +140,17 @@ class _RecentPageState extends State<RecentPage> {
                     bottom: 16,
                   ),
                 ),
-                actions: const [SyncingButton()],
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    tooltip: t.home.search.search,
+                    onPressed: () => showSearch(
+                      context: context,
+                      delegate: OcrSearchDelegate(),
+                    ),
+                  ),
+                  const SyncingButton(),
+                ],
               ),
             ),
             if (failed) ...[

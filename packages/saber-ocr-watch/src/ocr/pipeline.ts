@@ -1,5 +1,5 @@
 import { execFile as execFileCb } from "child_process";
-import { mkdtemp, mkdir, readdir, rm, writeFile } from "fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
 import { tmpdir } from "os";
@@ -7,6 +7,9 @@ import { config } from "../config.js";
 import { readSbn, resolveAssetPath, type EmbeddedAsset } from "../notes/sbn-reader.js";
 import { extractQuillText } from "./quill.js";
 import { ocrImage } from "./ollama.js";
+import { decryptNote, encryptPath, encryptNote, decryptFileName } from "../crypto.js";
+import { getDecryptionContext } from "../notes/discovery.js";
+import { basename, dirname } from "path";
 
 const execFile = promisify(execFileCb);
 
@@ -29,6 +32,7 @@ export type PdfExtractMode = "auto" | "force" | "never";
 
 export interface OcrOptions {
   pdfExtract?: PdfExtractMode;
+  encrypted?: boolean;
 }
 
 /** Find embedded PDF assets in the note */
@@ -69,13 +73,50 @@ async function ocrPdfPages(pdfPath: string, imgDir: string): Promise<{ text: str
 export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<OcrResult> {
   const pdfExtract = opts.pdfExtract ?? "auto";
   const start = Date.now();
-  const ocrPath = notePath + ".ocr";
+  let ocrPath = notePath + ".md";
   const tempDir = await createTempDir();
   const imgDir = join(tempDir, "pages");
 
   try {
-    // 1. Parse the .sbn2 BSON
-    const doc = await readSbn(notePath);
+    // 1. Parse the note — decrypt if encrypted (.sbe)
+    let doc;
+    let effectiveNotePath = notePath;
+    if (opts.encrypted) {
+      const ctx = await getDecryptionContext();
+      if (!ctx) throw new Error("Decryption context not available");
+      const encryptedBytes = await readFile(notePath);
+      const decryptedBytes = decryptNote(encryptedBytes, ctx);
+      // Write decrypted note to temp dir
+      const tempSbn = join(tempDir, "decrypted.sbn2");
+      await writeFile(tempSbn, decryptedBytes);
+
+      // Decrypt sidecar files (e.g. .sbn2.0, .sbn2.1) into temp dir
+      const encHex = basename(notePath, ".sbe");
+      const decryptedName = decryptFileName(encHex, ctx);
+      const noteDir = dirname(notePath);
+      const sbeFiles = await readdir(noteDir);
+      for (const sbeFile of sbeFiles) {
+        if (!sbeFile.endsWith(".sbe") || sbeFile === basename(notePath)) continue;
+        try {
+          const sbeHex = basename(sbeFile, ".sbe");
+          const sbeDecName = decryptFileName(sbeHex, ctx);
+          // Check if this is a sidecar of our note (e.g. "note.sbn2.0")
+          if (sbeDecName.startsWith(decryptedName + ".")) {
+            const suffix = sbeDecName.substring(decryptedName.length);
+            const sidecarEncBytes = await readFile(join(noteDir, sbeFile));
+            const sidecarDecBytes = decryptNote(sidecarEncBytes, ctx);
+            await writeFile(join(tempDir, "decrypted.sbn2" + suffix), sidecarDecBytes);
+          }
+        } catch {
+          // Skip files we can't decrypt
+        }
+      }
+
+      effectiveNotePath = tempSbn;
+      doc = await readSbn(tempSbn);
+    } else {
+      doc = await readSbn(notePath);
+    }
 
     // 2. Extract quill text (free — no OCR needed for typed content)
     const quillParts: string[] = [];
@@ -99,7 +140,7 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
     if (shouldExtractPdf && embeddedPdfs.length > 0) {
       // Resolve the embedded PDF to a file path
       const asset = embeddedPdfs[0];
-      const resolved = await resolveAssetPath(notePath, asset, doc.inlineAssets);
+      const resolved = await resolveAssetPath(effectiveNotePath, asset, doc.inlineAssets);
 
       if ("path" in resolved) {
         embeddedPdfPath = resolved.path;
@@ -153,8 +194,23 @@ export async function ocrNote(notePath: string, opts: OcrOptions = {}): Promise<
     }
     const fullText = sections.join("\n\n");
 
-    // 7. Write .sbn2.ocr
-    await writeFile(ocrPath, fullText, "utf-8");
+    // 7. Write OCR cache — encrypt if the source note was encrypted
+    if (opts.encrypted) {
+      const ctx = await getDecryptionContext();
+      if (!ctx) throw new Error("Decryption context not available");
+      // Encrypt OCR text with same key as notes
+      const encryptedOcr = encryptNote(Buffer.from(fullText, "utf-8"), ctx);
+      // Derive encrypted filename: encrypt the note's decrypted path + ".ocr"
+      const encHex = basename(notePath, ".sbe");
+      const decryptedName = decryptFileName(encHex, ctx);
+      const ocrName = decryptedName + ".md";
+      const encryptedOcrName = encryptPath(ocrName, ctx) + ".sbe";
+      const encryptedOcrPath = join(dirname(notePath), encryptedOcrName);
+      await writeFile(encryptedOcrPath, encryptedOcr);
+      ocrPath = encryptedOcrPath;
+    } else {
+      await writeFile(ocrPath, fullText, "utf-8");
+    }
 
     return {
       notePath,
