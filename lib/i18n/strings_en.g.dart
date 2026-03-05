@@ -74,6 +74,7 @@ class TranslationsHomeEn {
 	// Translations
 	late final TranslationsHomeTabsEn tabs = TranslationsHomeTabsEn.internal(_root);
 	late final TranslationsHomeTitlesEn titles = TranslationsHomeTitlesEn.internal(_root);
+	late final TranslationsHomeSearchEn search = TranslationsHomeSearchEn.internal(_root);
 	late final TranslationsHomeTooltipsEn tooltips = TranslationsHomeTooltipsEn.internal(_root);
 	late final TranslationsHomeCreateEn create = TranslationsHomeCreateEn.internal(_root);
 
@@ -359,6 +360,24 @@ class TranslationsHomeTitlesEn {
 
 	/// en: 'Settings'
 	String get settings => 'Settings';
+}
+
+// Path: home.search
+class TranslationsHomeSearchEn {
+	TranslationsHomeSearchEn.internal(this._root);
+
+	final Translations _root; // ignore: unused_field
+
+	// Translations
+
+	/// en: 'Search notes'
+	String get search => 'Search notes';
+
+	/// en: 'No results found'
+	String get noResults => 'No results found';
+
+	/// en: 'Search handwritten and typed text...'
+	String get hint => 'Search handwritten and typed text...';
 }
 
 // Path: home.tooltips
