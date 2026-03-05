@@ -59,7 +59,7 @@ async function processNote(notePath: string): Promise<void> {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
       console.error(
-        `[saber-ocr-watch] Ollama unavailable, skipping "${name}": ${msg}`,
+        `[saber-ocr-watch] Vision API unavailable, skipping "${name}": ${msg}`,
       );
     } else {
       console.error(`[saber-ocr-watch] Failed to OCR "${name}": ${msg}`);
