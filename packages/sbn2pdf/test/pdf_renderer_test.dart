@@ -72,15 +72,17 @@ void main() {
 
     test('renderToFile writes to disk', () async {
       final doc = SbnParser.parseFile('$_examplesDir/v17_squiggles.sbn2');
-      const outPath = '/tmp/sbn2pdf_test_output.pdf';
-      await PdfRenderer.renderToFile(doc, outPath);
+      final tempDir = Directory.systemTemp.createTempSync('sbn2pdf_test_');
+      final outPath = '${tempDir.path}/sbn2pdf_test_output.pdf';
+      try {
+        await PdfRenderer.renderToFile(doc, outPath);
 
-      final file = File(outPath);
-      expect(file.existsSync(), isTrue);
-      expect(file.lengthSync(), greaterThan(100));
-
-      // Clean up
-      file.deleteSync();
+        final file = File(outPath);
+        expect(file.existsSync(), isTrue);
+        expect(file.lengthSync(), greaterThan(100));
+      } finally {
+        tempDir.deleteSync(recursive: true);
+      }
     });
   });
 }

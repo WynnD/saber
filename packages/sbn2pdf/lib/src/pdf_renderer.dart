@@ -29,7 +29,7 @@ class PdfRenderer {
 
     // Skip trailing empty pages (matching Saber's behavior)
     var pages = doc.pages;
-    if (pages.isNotEmpty && _isPageEmpty(pages.last)) {
+    while (pages.isNotEmpty && _isPageEmpty(pages.last)) {
       pages = pages.sublist(0, pages.length - 1);
     }
 
@@ -251,7 +251,11 @@ class PdfRenderer {
           height: image.height,
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      warnings.add(
+        'Failed to decode image asset ${image.assetIndex ?? image.id} '
+        'with extension "$ext": $e',
+      );
       return null;
     }
   }
