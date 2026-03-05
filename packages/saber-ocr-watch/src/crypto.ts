@@ -24,6 +24,18 @@ function aesDecrypt(data: Buffer, key: Buffer, iv: Buffer): Buffer {
   return Buffer.concat([decipher.update(data), decipher.final()]);
 }
 
+/** Strip PKCS7 padding from decrypted data */
+function stripPkcs7(data: Buffer): Buffer {
+  if (data.length === 0) return data;
+  const padByte = data[data.length - 1];
+  if (padByte < 1 || padByte > 16) return data;
+  // Verify all padding bytes are the same
+  for (let i = data.length - padByte; i < data.length; i++) {
+    if (data[i] !== padByte) return data;
+  }
+  return data.subarray(0, data.length - padByte);
+}
+
 /** Load and parse Saber's config.sbc from the notes directory */
 async function loadSaberConfig(): Promise<SaberConfig> {
   const configPath = config.notesDir + "/config.sbc";
@@ -68,7 +80,7 @@ export function decryptNote(
   encrypted: Buffer,
   ctx: DecryptionContext,
 ): Buffer {
-  return aesDecrypt(encrypted, ctx.noteKey, ctx.iv);
+  return stripPkcs7(aesDecrypt(encrypted, ctx.noteKey, ctx.iv));
 }
 
 /** Decrypt an encrypted file name (hex-encoded) back to original path */
@@ -77,7 +89,8 @@ export function decryptFileName(
   ctx: DecryptionContext,
 ): string {
   const encrypted = Buffer.from(encryptedHex, "hex");
-  return aesDecrypt(encrypted, ctx.passwordKey, ctx.iv).toString("utf-8");
+  const decrypted = stripPkcs7(aesDecrypt(encrypted, ctx.passwordKey, ctx.iv));
+  return decrypted.toString("utf-8");
 }
 
 /** Encrypt a path to match Saber's file naming (for lookups) */

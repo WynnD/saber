@@ -74,6 +74,8 @@ export async function discoverNotes(dir?: string): Promise<NoteInfo[]> {
         const encHex = basename(entry.name, ".sbe");
         try {
           const decryptedPath = decryptFileName(encHex, ctx);
+          // Only process actual .sbn2 note files, skip sidecars (.sbn2.0, .sbn2.p, .sbn2.ocr)
+          if (!decryptedPath.endsWith(".sbn2")) continue;
           const noteName = decryptedPath.replace(/\.sbn2$/, "").replace(/^\//, "");
           const s = await stat(full);
           // OCR cache lives next to the encrypted file
