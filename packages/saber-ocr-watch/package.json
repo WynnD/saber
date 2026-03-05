@@ -1,0 +1,20 @@
+{
+  "name": "saber-ocr-watch",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "saber-ocr-watch": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "bson": "^6.10.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
+  }
+}
